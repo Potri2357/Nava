@@ -30,16 +30,22 @@ export async function parseJobDescription(rawDescription: string): Promise<Parse
     return parseJobDescriptionHeuristic(rawDescription);
   }
 
-  const parsed = await llmClient.generateStructured<ParsedJD>({
-    systemPrompt: JD_PARSER_SYSTEM_PROMPT,
-    userPrompt: `Job Description:\n\n${rawDescription}`,
-    schema: ParsedJDSchema,
-    schemaName: 'ParsedJD',
-    config: {
-      model: 'gemini-2.0-flash',
-      temperature: 0.0, // Zero temperature for deterministic extraction
-    },
-  });
+  let parsed: ParsedJD;
+  try {
+    parsed = await llmClient.generateStructured<ParsedJD>({
+      systemPrompt: JD_PARSER_SYSTEM_PROMPT,
+      userPrompt: `Job Description:\n\n${rawDescription}`,
+      schema: ParsedJDSchema,
+      schemaName: 'ParsedJD',
+      config: {
+        model: 'gemini-2.0-flash',
+        temperature: 0.0, // Zero temperature for deterministic extraction
+      },
+    });
+  } catch (error) {
+    console.warn('JD LLM parsing failed; using heuristic parser.', error);
+    return parseJobDescriptionHeuristic(rawDescription);
+  }
 
   return parsed;
 }

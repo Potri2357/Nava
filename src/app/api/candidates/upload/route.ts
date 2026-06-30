@@ -3,7 +3,10 @@ import { createClient } from '@/lib/supabase/server';
 import { extractCandidateText } from '@/features/candidates/services/file-parser';
 import { parseResumeText } from '@/features/candidates/services/resume-parser';
 import { detectGaming } from '@/features/anti-gaming/services/gaming-detector';
+import { hasSupabaseServerConfig } from '@/lib/env';
 import crypto from 'crypto';
+
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   try {
@@ -23,6 +26,23 @@ export async function POST(req: Request) {
 
     // Deduplication check
     const fileHash = crypto.createHash('sha256').update(rawText).digest('hex');
+    const { inferred_github, ...parsedProfile } = await parseResumeText(rawText);
+    const antiGaming = detectGaming(rawText);
+
+    if (!hasSupabaseServerConfig()) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: `demo-${fileHash.slice(0, 12)}`,
+          status: 'parsed_demo',
+          parsed_profile: parsedProfile,
+          github_username: inferred_github || null,
+          anti_gaming: antiGaming,
+        },
+        message: 'Candidate parsed in demo mode. Configure Supabase to persist uploads.',
+      });
+    }
+
     const supabase = await createClient();
     
     const { data: existing } = await supabase
@@ -38,10 +58,6 @@ export async function POST(req: Request) {
         message: 'Candidate already exists in the database'
       });
     }
-
-    // Call LLM parser
-    const { inferred_github, ...parsedProfile } = await parseResumeText(rawText);
-    const antiGaming = detectGaming(rawText);
 
     // Save to DB (without embedding yet, embedding happens async or in trigger, but we'll do it later or in a separate step)
     const { data: inserted, error: insertError } = await supabase

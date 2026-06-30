@@ -1,19 +1,39 @@
+import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
 import mammoth from "mammoth";
 import Papa from "papaparse";
-import { PDFParse } from "pdf-parse";
+
+const execFileAsync = promisify(execFile);
+
+async function extractPdfText(buffer: Buffer) {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "nava-pdf-"));
+  const pdfPath = path.join(tempDir, `${randomUUID()}.pdf`);
+  const cliPath = path.join(process.cwd(), "node_modules", "pdf-parse", "bin", "cli.mjs");
+
+  try {
+    await writeFile(pdfPath, buffer);
+    const { stdout } = await execFileAsync(process.execPath, [cliPath, "text", pdfPath], {
+      cwd: process.cwd(),
+      maxBuffer: 20 * 1024 * 1024,
+      timeout: 30_000,
+    });
+
+    return stdout;
+  } finally {
+    await rm(tempDir, { force: true, recursive: true });
+  }
+}
 
 export async function extractCandidateText(file: File, buffer: Buffer) {
   const name = file.name.toLowerCase();
   const type = file.type;
 
   if (type === "application/pdf" || name.endsWith(".pdf")) {
-    const parser = new PDFParse({ data: buffer });
-    try {
-      const result = await parser.getText();
-      return result.text;
-    } finally {
-      await parser.destroy();
-    }
+    return extractPdfText(buffer);
   }
 
   if (

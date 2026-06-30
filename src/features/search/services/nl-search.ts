@@ -25,6 +25,9 @@ export async function processNaturalLanguageSearch(rawQuery: string) {
         userPrompt: `Query: ${rawQuery}`,
         schema: NLSearchSchema,
         schemaName: 'NLSearchQuery',
+      }).catch((error) => {
+        console.warn('NL search LLM parsing failed; using heuristic parser.', error);
+        return parseSearchHeuristic(rawQuery);
       })
     : parseSearchHeuristic(rawQuery);
 

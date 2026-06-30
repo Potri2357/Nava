@@ -49,16 +49,22 @@ export async function parseResumeText(rawText: string): Promise<ParsedProfile & 
     return parseResumeTextHeuristic(rawText);
   }
 
-  const parsed = await llmClient.generateStructured<z.infer<typeof ParsedProfileSchema>>({
-    systemPrompt: RESUME_PARSER_SYSTEM_PROMPT,
-    userPrompt: `Resume Text:\n\n${rawText}`,
-    schema: ParsedProfileSchema,
-    schemaName: 'ParsedProfile',
-    config: {
-      model: 'gemini-2.0-flash',
-      temperature: 0.0, // Deterministic extraction
-    },
-  });
+  let parsed: z.infer<typeof ParsedProfileSchema>;
+  try {
+    parsed = await llmClient.generateStructured<z.infer<typeof ParsedProfileSchema>>({
+      systemPrompt: RESUME_PARSER_SYSTEM_PROMPT,
+      userPrompt: `Resume Text:\n\n${rawText}`,
+      schema: ParsedProfileSchema,
+      schemaName: 'ParsedProfile',
+      config: {
+        model: 'gemini-2.0-flash',
+        temperature: 0.0, // Deterministic extraction
+      },
+    });
+  } catch (error) {
+    console.warn('Resume LLM parsing failed; using heuristic parser.', error);
+    return parseResumeTextHeuristic(rawText);
+  }
 
   return parsed as ParsedProfile & { inferred_github: string | null };
 }

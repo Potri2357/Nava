@@ -69,16 +69,21 @@ GITHUB SIGNALS:
 ${githubSignals ? JSON.stringify(githubSignals, null, 2) : 'No GitHub data available (Default platform_activity to 0.5)'}
   `;
 
-  return await llmClient.generateStructured<CandidateScoringResult>({
-    systemPrompt: SCORING_SYSTEM_PROMPT,
-    userPrompt,
-    schema: CandidateScoringSchema,
-    schemaName: 'CandidateScoringResult',
-    config: {
-      model: 'gemini-2.0-flash',
-      temperature: 0.1, // Low temp for consistent scores
-    },
-  });
+  try {
+    return await llmClient.generateStructured<CandidateScoringResult>({
+      systemPrompt: SCORING_SYSTEM_PROMPT,
+      userPrompt,
+      schema: CandidateScoringSchema,
+      schemaName: 'CandidateScoringResult',
+      config: {
+        model: 'gemini-2.0-flash',
+        temperature: 0.1, // Low temp for consistent scores
+      },
+    });
+  } catch (error) {
+    console.warn('Candidate LLM scoring failed; using heuristic scorer.', error);
+    return scoreCandidateHeuristic(parsedJd, parsedProfile, githubSignals);
+  }
 }
 
 function scoreCandidateHeuristic(
