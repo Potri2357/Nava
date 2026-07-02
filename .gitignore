@@ -51,3 +51,4 @@ next-env.d.ts
 /tmp
 /temp
 /.turbo
+/.nava-data

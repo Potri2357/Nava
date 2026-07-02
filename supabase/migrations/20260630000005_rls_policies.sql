@@ -10,31 +10,34 @@ ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
 ALTER TABLE skills_ontology ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 
--- Demo mode: allow anonymous read access to seeded data (source = 'demo')
-CREATE POLICY "demo_read_jobs" ON jobs
-  FOR SELECT USING (status = 'active' OR auth.uid() IS NOT NULL);
+-- Public recruiter workflow can read active jobs.
+CREATE POLICY "read_active_jobs" ON jobs
+  FOR SELECT USING (status = 'active');
 
--- Authenticated users can CRUD their own jobs
+-- Public recruiter workflow can create jobs through the app API.
+CREATE POLICY "insert_jobs" ON jobs
+  FOR INSERT WITH CHECK (source IN ('upload', 'bulk', 'api'));
+
+-- Authenticated users can CRUD their own jobs.
 CREATE POLICY "own_jobs" ON jobs
   FOR ALL USING (auth.uid() = created_by);
 
--- All authenticated users can read candidates
+-- Public recruiter workflow can read and upload original candidates.
 CREATE POLICY "read_candidates" ON candidates
-  FOR SELECT USING (source = 'demo' OR auth.uid() IS NOT NULL);
+  FOR SELECT USING (true);
 
--- Scores readable by authenticated users
+CREATE POLICY "insert_candidates" ON candidates
+  FOR INSERT WITH CHECK (source IN ('upload', 'bulk', 'api'));
+
+-- Public recruiter workflow can read and write scores generated from original uploads.
 CREATE POLICY "read_scores" ON scores
-  FOR SELECT USING (
-    auth.uid() IS NOT NULL
-    OR EXISTS (
-      SELECT 1
-      FROM jobs j
-      JOIN candidates c ON c.id = scores.candidate_id
-      WHERE j.id = scores.job_id
-        AND j.source = 'demo'
-        AND c.source = 'demo'
-    )
-  );
+  FOR SELECT USING (true);
+
+CREATE POLICY "insert_scores" ON scores
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "update_scores" ON scores
+  FOR UPDATE USING (true) WITH CHECK (true);
 
 -- Feedback only by the recruiter who created it
 CREATE POLICY "own_feedback" ON feedback

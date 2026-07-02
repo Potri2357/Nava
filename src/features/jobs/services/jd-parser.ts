@@ -56,6 +56,12 @@ function parseJobDescriptionHeuristic(rawDescription: string): ParsedJD {
     'TypeScript', 'JavaScript', 'React', 'Next.js', 'Node.js', 'Python', 'Go', 'Rust',
     'PostgreSQL', 'MongoDB', 'Redis', 'Kafka', 'Kubernetes', 'Docker', 'AWS',
     'GCP', 'Azure', 'LLM APIs', 'Machine Learning', 'Observability', 'Distributed Systems',
+    'Java', 'C#', 'C++', 'Swift', 'Kotlin', 'React Native', 'GraphQL', 'REST', 'MySQL',
+    'SQL', 'Snowflake', 'Databricks', 'Spark', 'TensorFlow', 'PyTorch', 'Pandas', 'NumPy',
+    'Terraform', 'CI/CD', 'Jenkins', 'Testing', 'Playwright', 'Cypress', 'Debugging',
+    'Product Strategy', 'Analytics', 'User Research', 'Roadmapping', 'Design Systems',
+    'Prototyping', 'Accessibility', 'Figma', 'Threat Modeling', 'Compliance', 'Vector Search',
+    'AI Products',
   ];
   const required_skills = knownSkills.filter((skill) => text.includes(skill.toLowerCase()));
   const seniority = text.includes('director')

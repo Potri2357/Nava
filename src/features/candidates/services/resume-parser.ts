@@ -3,6 +3,8 @@ import { llmClient } from '@/lib/llm/client';
 import { ParsedProfile } from '../types';
 
 export const ParsedProfileSchema = z.object({
+  full_name: z.string().nullable().describe('Candidate full name from the resume header. Null if not confidently present.'),
+  email: z.string().email().nullable().describe('Candidate email address if present.'),
   skills: z.array(z.object({
     name: z.string().describe('The name of the skill/technology (e.g. "React", "Python")'),
     years: z.number().nullable().describe('Estimated years of experience using this skill, based on work history. Null if indeterminable.'),
@@ -44,7 +46,9 @@ Important Rules:
 5. Search for a GitHub link (e.g. github.com/username) and extract the username if present.
 `;
 
-export async function parseResumeText(rawText: string): Promise<ParsedProfile & { inferred_github: string | null }> {
+export async function parseResumeText(rawText: string): Promise<
+  ParsedProfile & { full_name: string | null; email: string | null; inferred_github: string | null }
+> {
   if (!process.env.GEMINI_API_KEY) {
     return parseResumeTextHeuristic(rawText);
   }
@@ -66,16 +70,31 @@ export async function parseResumeText(rawText: string): Promise<ParsedProfile & 
     return parseResumeTextHeuristic(rawText);
   }
 
-  return parsed as ParsedProfile & { inferred_github: string | null };
+  return parsed as ParsedProfile & { full_name: string | null; email: string | null; inferred_github: string | null };
 }
 
-function parseResumeTextHeuristic(rawText: string): ParsedProfile & { inferred_github: string | null } {
+function parseResumeTextHeuristic(rawText: string): ParsedProfile & {
+  full_name: string | null;
+  email: string | null;
+  inferred_github: string | null;
+} {
   const text = rawText.toLowerCase();
+  const cleanedLines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const email = rawText.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? null;
+  const fullName = inferCandidateName(cleanedLines, email);
   const knownSkills = [
     'TypeScript', 'JavaScript', 'React', 'Next.js', 'Node.js', 'Python', 'Go', 'Rust',
     'PostgreSQL', 'MongoDB', 'Redis', 'Kafka', 'Kubernetes', 'Docker', 'AWS',
     'GCP', 'Azure', 'LLM APIs', 'Machine Learning', 'Observability', 'Distributed Systems',
-    'People Management', 'Fintech',
+    'People Management', 'Fintech', 'Java', 'C#', 'C++', 'Swift', 'Kotlin', 'React Native',
+    'GraphQL', 'REST', 'MySQL', 'SQL', 'Snowflake', 'Databricks', 'Spark', 'TensorFlow',
+    'PyTorch', 'scikit-learn', 'Pandas', 'NumPy', 'Terraform', 'CI/CD', 'Jenkins',
+    'Testing', 'Playwright', 'Cypress', 'Debugging', 'Product Strategy', 'Analytics',
+    'User Research', 'Roadmapping', 'Design Systems', 'Prototyping', 'Accessibility',
+    'Figma', 'Threat Modeling', 'Compliance', 'Vector Search', 'AI Products',
   ];
   const skills = knownSkills
     .filter((skill) => text.includes(skill.toLowerCase()))
@@ -94,6 +113,8 @@ function parseResumeTextHeuristic(rawText: string): ParsedProfile & { inferred_g
   const graduationYear = rawText.match(/\b(20\d{2}|19\d{2})\b/)?.[1];
 
   return {
+    full_name: fullName,
+    email,
     skills,
     experience: [
       {
@@ -120,4 +141,29 @@ function parseResumeTextHeuristic(rawText: string): ParsedProfile & { inferred_g
     summary: rawText.replace(/\s+/g, ' ').slice(0, 240),
     inferred_github,
   };
+}
+
+function inferCandidateName(lines: string[], email: string | null) {
+  const noisyHeader = /\b(resume|curriculum|vitae|cv|email|phone|linkedin|github|portfolio|address|summary|objective|profile)\b/i;
+  const emailLocalName = email
+    ?.split("@")[0]
+    .replace(/[._-]+/g, " ")
+    .replace(/\d+/g, "")
+    .trim();
+
+  for (const line of lines.slice(0, 8)) {
+    if (noisyHeader.test(line) || /[@:/\\|]/.test(line)) continue;
+    const words = line.match(/[A-Za-z][A-Za-z'-]+/g) ?? [];
+    if (words.length >= 2 && words.length <= 4 && line.length <= 60) {
+      return words.map((word) => word[0].toUpperCase() + word.slice(1).toLowerCase()).join(" ");
+    }
+  }
+
+  return emailLocalName
+    ? emailLocalName
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((word) => word[0].toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ")
+    : null;
 }

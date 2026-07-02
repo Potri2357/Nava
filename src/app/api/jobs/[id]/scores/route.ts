@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server";
-import { demoRankingsForJob, liveScoreToRankedCandidate } from "@/features/demo/ranking";
-import { hasSupabaseServerConfig } from "@/lib/env";
-import { createClient } from "@/lib/supabase/server";
+import { liveScoreToRankedCandidate } from "@/features/recruiter/ranking";
+import { hasSupabaseAdminConfig } from "@/lib/env";
+import { listLocalScores } from "@/lib/local-store";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getSupabaseErrorMessage, isRecoverableSupabaseSetupError } from "@/lib/supabase/errors";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  if (!hasSupabaseServerConfig() || id.startsWith("job-")) {
+  if (!hasSupabaseAdminConfig() || id.startsWith("local-job-")) {
     return NextResponse.json({
       success: true,
-      source: "demo",
-      data: demoRankingsForJob(id),
+      source: "local",
+      data: (await listLocalScores(id)).map(liveScoreToRankedCandidate),
     });
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from("scores")
       .select(`
@@ -36,17 +38,26 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
     if (error) throw error;
 
+    const localScores = (await listLocalScores(id)).map(liveScoreToRankedCandidate);
     return NextResponse.json({
       success: true,
-      source: "supabase",
-      data: data?.map(liveScoreToRankedCandidate) ?? [],
+      source: data && data.length > 0 ? "supabase" : "local",
+      data: data && data.length > 0 ? data.map(liveScoreToRankedCandidate) : localScores,
     });
   } catch (error) {
+    if (isRecoverableSupabaseSetupError(error)) {
+      return NextResponse.json({
+        success: true,
+        source: "local",
+        data: (await listLocalScores(id)).map(liveScoreToRankedCandidate),
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      source: "demo",
-      warning: error instanceof Error ? error.message : "Unable to load Supabase scores",
-      data: demoRankingsForJob(id),
+      source: "error",
+      warning: getSupabaseErrorMessage(error, "Unable to load Supabase scores"),
+      data: [],
     });
   }
 }

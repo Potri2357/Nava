@@ -4,13 +4,13 @@ Explainable candidate ranking for recruiters. Nava parses job descriptions and c
 
 ## Implemented
 
-- Zero-setup public demo at `/` with seeded jobs and candidates.
+- Live recruiter command center at `/` using original Supabase jobs, uploads, and scores.
 - Semantic skill matching, career trajectory scoring, anti-gaming detection, weighted TOPSIS ranking, and CSV export.
 - Recruiter controls for blind review, scoring weights, natural-language search intent, interview focus, and "Why Not #1" comparison.
 - Upload API for PDF, DOCX, CSV, JSON, and TXT candidate files.
 - Job creation API with JD parsing.
-- Supabase schema for jobs, candidates, scores, feedback, skills ontology, hybrid search, bias audit, RLS, and demo-readable data.
-- Gemini-backed structured parsing/scoring when `GEMINI_API_KEY` is present, with deterministic heuristic fallbacks when it is not.
+- Supabase schema for jobs, candidates, scores, feedback, skills ontology, hybrid search, bias audit, and RLS.
+- Gemini-backed structured parsing/scoring when `GEMINI_API_KEY` is present, with deterministic heuristic parsing/scoring fallbacks for original uploaded content when it is not.
 
 ## Run Locally
 
@@ -27,14 +27,37 @@ Copy `.env.example` to `.env.local` and fill in values when you want the live Su
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 GEMINI_API_KEY=
 GITHUB_PAT=
-NEXT_PUBLIC_DEMO_MODE=true
 ```
 
-Without these keys, the demo and heuristic parser/scorer still run.
+Without Supabase keys, the app shows setup and empty states.
+
+## Supabase Schema
+
+Your hosted Supabase project must have the schema before uploads can persist.
+
+Use one of these:
+
+```bash
+npx supabase login
+npm run db:link
+npm run db:push
+```
+
+Or open the Supabase SQL editor and run:
+
+```text
+supabase/setup/apply_schema.sql
+```
+
+Verify the hosted project:
+
+```bash
+npm run db:check
+```
 
 ## Scripts
 
@@ -42,10 +65,9 @@ Without these keys, the demo and heuristic parser/scorer still run.
 npm run dev
 npm run build
 npm run lint
+npm run db:link
+npm run db:push
+npm run db:check
 ```
 
-Seed external Supabase demo data from `dataset/jds` and `dataset/resumes`:
-
-```bash
-npx tsx --env-file=.env.local scripts/seed-demo-data.ts
-```
+Create jobs through `/dashboard/jobs/new` and upload candidate files from `/`.

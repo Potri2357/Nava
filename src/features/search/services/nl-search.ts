@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { llmClient } from '@/lib/llm/client';
 import { createClient } from '@/lib/supabase/server';
+import { getSupabasePublicKey, hasSupabaseServerConfig } from '@/lib/env';
 
 const NLSearchSchema = z.object({
   semantic_query: z.string().describe('The core search intent to be embedded for vector search. E.g. "senior backend engineer with open source contributions"'),
@@ -33,7 +34,8 @@ export async function processNaturalLanguageSearch(rawQuery: string) {
 
   const supabase = await createClient();
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  const supabaseKey = getSupabasePublicKey();
+  if (!hasSupabaseServerConfig() || !supabaseKey) {
     return {
       structuredQuery,
       results: [],
@@ -45,7 +47,7 @@ export async function processNaturalLanguageSearch(rawQuery: string) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${supabaseKey}`,
     },
     body: JSON.stringify({
       text: structuredQuery.semantic_query,

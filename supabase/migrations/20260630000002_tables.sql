@@ -18,7 +18,7 @@ CREATE TABLE jobs (
   }',
   embedding       VECTOR(384),
   status          TEXT DEFAULT 'active' CHECK (status IN ('draft', 'active', 'paused', 'closed')),
-  source          TEXT DEFAULT 'upload' CHECK (source IN ('upload', 'bulk', 'api', 'demo')),
+  source          TEXT DEFAULT 'upload' CHECK (source IN ('upload', 'bulk', 'api')),
   created_by      UUID, -- references auth.users(id) - assuming we map it later or keep it loose for now, but usually Supabase uses auth.users
   created_at      TIMESTAMPTZ DEFAULT now(),
   updated_at      TIMESTAMPTZ DEFAULT now()
@@ -41,7 +41,7 @@ CREATE TABLE candidates (
   anti_gaming_flag    BOOLEAN DEFAULT FALSE,
   anti_gaming_score   NUMERIC,
   anti_gaming_reasons JSONB,
-  source          TEXT DEFAULT 'upload' CHECK (source IN ('upload', 'bulk', 'api', 'demo')),
+  source          TEXT DEFAULT 'upload' CHECK (source IN ('upload', 'bulk', 'api')),
   created_at      TIMESTAMPTZ DEFAULT now(),
   updated_at      TIMESTAMPTZ DEFAULT now()
 );

@@ -59,15 +59,17 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       <div className="flex flex-col">
         <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
           <Sheet>
-            <SheetTrigger>
-              <Button
-                variant="outline"
-                size="icon"
-                className="shrink-0 md:hidden"
-              >
+            <SheetTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 md:hidden"
+                />
+              }
+            >
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">Toggle navigation menu</span>
-              </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col">
               <nav className="grid gap-2 text-lg font-medium mt-4">
@@ -86,7 +88,7 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" className="hidden sm:flex">
-              Demo Mode
+              Live Mode
             </Button>
           </div>
         </header>

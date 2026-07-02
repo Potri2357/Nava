@@ -11,12 +11,14 @@ export interface Candidate {
   anti_gaming_flag: boolean;
   anti_gaming_score: number | null;
   anti_gaming_reasons: string[] | null;
-  source: 'upload' | 'bulk' | 'api' | 'demo';
+  source: 'upload' | 'bulk' | 'api';
   created_at: string;
   updated_at: string;
 }
 
 export interface ParsedProfile {
+  full_name?: string | null;
+  email?: string | null;
   skills: {
     name: string;
     canonical?: string;

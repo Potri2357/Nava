@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { hasSupabaseAdminConfig } from '@/lib/env';
+import { getSupabaseServerKey, hasSupabaseAdminConfig } from '@/lib/env';
 
 // Note: This should only be used in secure backend environments (like Edge Functions or secure API routes)
 // where bypassing Row Level Security is required (e.g. background processing, seeding).
@@ -10,7 +10,7 @@ export function createAdminClient() {
 
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    getSupabaseServerKey()!,
     {
       auth: {
         persistSession: false,

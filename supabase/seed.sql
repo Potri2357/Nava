@@ -1,0 +1,2 @@
+-- Intentionally empty.
+-- Nava uses original jobs and candidate uploads only.

@@ -1,21 +1,22 @@
 import { NextResponse } from "next/server";
-import { demoJobs } from "@/features/demo/data";
 import { parseJobDescription } from "@/features/jobs/services/jd-parser";
-import { defaultWeights } from "@/features/demo/data";
-import { hasSupabaseServerConfig } from "@/lib/env";
-import { createClient } from "@/lib/supabase/server";
+import { defaultWeights } from "@/features/jobs/constants";
+import { hasSupabaseAdminConfig } from "@/lib/env";
+import { ensureLocalRoleCatalog, insertLocalJob } from "@/lib/local-store";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getSupabaseErrorMessage, isRecoverableSupabaseSetupError } from "@/lib/supabase/errors";
 
 export async function GET() {
-  if (!hasSupabaseServerConfig()) {
+  if (!hasSupabaseAdminConfig()) {
     return NextResponse.json({
       success: true,
-      source: "demo",
-      data: demoJobs,
+      source: "local",
+      data: await ensureLocalRoleCatalog(),
     });
   }
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase
       .from("jobs")
       .select("id, title, company, raw_description, parsed_requirements, scoring_weights, status, source")
@@ -25,28 +26,31 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      source: "supabase",
-      data: data?.length ? data : demoJobs,
+      source: data && data.length > 0 ? "supabase" : "local",
+      warning: data && data.length > 0 ? undefined : "Using local role catalog because Supabase has no jobs yet.",
+      data: data && data.length > 0 ? data : await ensureLocalRoleCatalog(),
     });
   } catch (error) {
+    if (isRecoverableSupabaseSetupError(error)) {
+      return NextResponse.json({
+        success: true,
+        source: "local",
+        warning: "Using local original jobs until Supabase schema is applied.",
+        data: await ensureLocalRoleCatalog(),
+      });
+    }
+
     return NextResponse.json({
       success: true,
-      source: "demo",
-      warning: error instanceof Error ? error.message : "Unable to load Supabase jobs",
-      data: demoJobs,
+      source: "error",
+      warning: getSupabaseErrorMessage(error, "Unable to load Supabase jobs"),
+      data: [],
     });
   }
 }
 
 export async function POST(req: Request) {
   try {
-    if (!hasSupabaseServerConfig()) {
-      return NextResponse.json(
-        { success: false, error: { code: "SUPABASE_NOT_CONFIGURED", message: "Configure Supabase env vars to create live jobs." } },
-        { status: 503 },
-      );
-    }
-
     const body = await req.json();
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const company = typeof body.company === "string" ? body.company.trim() : null;
@@ -61,33 +65,80 @@ export async function POST(req: Request) {
     }
 
     const parsed = await parseJobDescription(rawDescription);
-    const supabase = await createClient();
 
-    const { data, error } = await supabase
-      .from("jobs")
-      .insert({
+    if (!hasSupabaseAdminConfig()) {
+      const localJob = await insertLocalJob({
         title,
         company,
         raw_description: rawDescription,
         parsed_requirements: parsed,
         scoring_weights: scoringWeights,
-        status: "active",
-        source: "api",
-      })
-      .select("id, title, parsed_requirements")
-      .single();
-
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: { code: "DB_ERROR", message: error.message } },
-        { status: 500 },
-      );
+      });
+      return NextResponse.json({ success: true, source: "local", data: localJob });
     }
 
-    return NextResponse.json({ success: true, data });
+    try {
+      const supabase = createAdminClient();
+
+      const { data, error } = await supabase
+        .from("jobs")
+        .insert({
+          title,
+          company,
+          raw_description: rawDescription,
+          parsed_requirements: parsed,
+          scoring_weights: scoringWeights,
+          status: "active",
+          source: "api",
+        })
+        .select("id, title, parsed_requirements")
+        .single();
+
+      if (error) {
+        if (isRecoverableSupabaseSetupError(error)) {
+          const localJob = await insertLocalJob({
+            title,
+            company,
+            raw_description: rawDescription,
+            parsed_requirements: parsed,
+            scoring_weights: scoringWeights,
+          });
+          return NextResponse.json({
+            success: true,
+            source: "local",
+            warning: "Job persisted locally until Supabase schema is available.",
+            data: localJob,
+          });
+        }
+
+        return NextResponse.json(
+          { success: false, error: { code: "DB_ERROR", message: getSupabaseErrorMessage(error, "Failed to insert job") } },
+          { status: 500 },
+        );
+      }
+
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      if (isRecoverableSupabaseSetupError(error)) {
+        const localJob = await insertLocalJob({
+          title,
+          company,
+          raw_description: rawDescription,
+          parsed_requirements: parsed,
+          scoring_weights: scoringWeights,
+        });
+        return NextResponse.json({
+          success: true,
+          source: "local",
+          warning: "Job persisted locally until Supabase schema is available.",
+          data: localJob,
+        });
+      }
+      throw error;
+    }
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: { code: "SERVER_ERROR", message: error instanceof Error ? error.message : "Unknown error" } },
+      { success: false, error: { code: "SERVER_ERROR", message: getSupabaseErrorMessage(error, "Unknown error") } },
       { status: 500 },
     );
   }

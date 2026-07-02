@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { hasSupabaseServerConfig } from '@/lib/env';
+import { getSupabasePublicKey, hasSupabaseServerConfig } from '@/lib/env';
 
 export async function createClient() {
   if (!hasSupabaseServerConfig()) {
@@ -11,7 +11,7 @@ export async function createClient() {
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    getSupabasePublicKey()!,
     {
       cookies: {
         getAll() {

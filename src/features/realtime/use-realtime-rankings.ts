@@ -3,8 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import type { DemoJob } from "@/features/demo/data";
-import type { DemoRankedCandidate } from "@/features/demo/ranking";
+import type { RankedCandidate, RecruiterJob } from "@/features/recruiter/types";
 import { hasSupabaseBrowserConfig } from "@/lib/env";
 import { createClient } from "@/lib/supabase/client";
 
@@ -17,30 +16,33 @@ async function getJson<T>(url: string): Promise<T> {
   return response.json();
 }
 
-export function useLiveJobs(initialJobs: DemoJob[]) {
+export function useLiveJobs(initialJobs: RecruiterJob[]) {
   return useQuery({
     queryKey: ["jobs"],
     queryFn: async () => {
-      const payload = await getJson<{ data: DemoJob[] }>("/api/jobs");
+      const payload = await getJson<{ data: RecruiterJob[] }>("/api/jobs");
       return payload.data;
     },
     initialData: initialJobs,
   });
 }
 
-export function useLiveRankings(jobId: string, initialRows: DemoRankedCandidate[]) {
+export function useLiveRankings(jobId: string, initialRows: RankedCandidate[]) {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["rankings", jobId],
     queryFn: async () => {
-      const payload = await getJson<{ data: DemoRankedCandidate[] }>(`/api/jobs/${jobId}/scores`);
+      const payload = await getJson<{ data: RankedCandidate[] }>(`/api/jobs/${jobId}/scores`);
       return payload.data;
     },
     initialData: initialRows,
+    enabled: Boolean(jobId),
+    refetchOnMount: "always",
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
-    if (!hasSupabaseBrowserConfig()) return;
+    if (!hasSupabaseBrowserConfig() || !jobId) return;
 
     let supabase;
     try {

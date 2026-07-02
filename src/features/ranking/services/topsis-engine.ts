@@ -24,6 +24,24 @@ export function computeTOPSIS(
   const m = weights.length;
   
   if (n === 0) return { rankings: [], idealSolution: [], antiIdealSolution: [] };
+  if (n === 1) {
+    const weightedScore = candidates[0].dimensions.reduce(
+      (sum, value, index) => sum + value * (weights[index] ?? 0),
+      0,
+    );
+
+    return {
+      rankings: [{
+        candidateId: candidates[0].candidateId,
+        closenessCoefficient: Math.max(0, Math.min(1, weightedScore)),
+        rank: 1,
+        distanceToIdeal: 0,
+        distanceToAntiIdeal: 0,
+      }],
+      idealSolution: candidates[0].dimensions,
+      antiIdealSolution: candidates[0].dimensions,
+    };
+  }
 
   const matrix = candidates.map(c => c.dimensions);
   

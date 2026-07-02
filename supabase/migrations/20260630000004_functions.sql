@@ -57,8 +57,10 @@ BEGIN
       s.rank AS s_rank,
       k.rank AS k_rank,
       -- RRF: 1/(rank + k) — rank-based, not score-based
-      COALESCE(semantic_weight * (1.0 / (COALESCE(s.rank, 1000) + rrf_k)), 0) +
-      COALESCE(keyword_weight  * (1.0 / (COALESCE(k.rank, 1000) + rrf_k)), 0) AS score
+      (
+        COALESCE(semantic_weight * (1.0 / (COALESCE(s.rank, 1000) + rrf_k)), 0) +
+        COALESCE(keyword_weight  * (1.0 / (COALESCE(k.rank, 1000) + rrf_k)), 0)
+      )::NUMERIC AS score
     FROM semantic s
     FULL OUTER JOIN keyword k ON s.id = k.id
   )
@@ -104,19 +106,26 @@ AS $$
 BEGIN
   -- Using graduation year as age proxy
   RETURN QUERY
+  WITH scored_candidates AS (
+    SELECT
+      s.composite_score,
+      c.parsed_profile->'education'->0->>'graduation_year' AS graduation_year
+    FROM scores s
+    JOIN candidates c ON s.candidate_id = c.id
+    WHERE s.job_id = target_job_id
+      AND c.parsed_profile->'education'->0->>'graduation_year' IS NOT NULL
+      AND c.parsed_profile->'education'->0->>'graduation_year' ~ '^[0-9]{4}$'
+  )
   SELECT
     'graduation_decade'::TEXT AS proxy_category,
-    (FLOOR(((c.parsed_profile->'education'->0->>'graduation_year')::INT) / 10.0) * 10)::TEXT
+    (FLOOR((sc.graduation_year::INT) / 10.0) * 10)::TEXT
       AS proxy_value,
     COUNT(*)::BIGINT AS candidate_count,
-    ROUND(AVG(s.composite_score), 4) AS avg_score,
-    ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY s.composite_score)::numeric, 4) AS median_score,
-    ROUND(MIN(s.composite_score), 4) AS min_score,
-    ROUND(MAX(s.composite_score), 4) AS max_score
-  FROM scores s
-  JOIN candidates c ON s.candidate_id = c.id
-  WHERE s.job_id = target_job_id
-    AND c.parsed_profile->'education'->0->>'graduation_year' IS NOT NULL
+    ROUND(AVG(sc.composite_score), 4) AS avg_score,
+    ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY sc.composite_score)::numeric, 4) AS median_score,
+    ROUND(MIN(sc.composite_score), 4) AS min_score,
+    ROUND(MAX(sc.composite_score), 4) AS max_score
+  FROM scored_candidates sc
   GROUP BY proxy_value
   ORDER BY proxy_value;
 END;
